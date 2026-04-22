@@ -1,0 +1,31 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  body {
+    @apply bg-white text-gray-900 antialiased;
+  }
+}
+
+.audit-report h2 {
+  @apply text-xl font-bold mt-8 mb-3 text-blue-700;
+}
+.audit-report h3 {
+  @apply text-lg font-semibold mt-5 mb-2;
+}
+.audit-report ul {
+  @apply list-disc ml-5 space-y-1;
+}
+.audit-report table {
+  @apply w-full text-sm border-collapse my-4;
+}
+.audit-report th {
+  @apply bg-gray-100 text-left px-3 py-2 font-semibold border border-gray-200;
+}
+.audit-report td {
+  @apply px-3 py-2 border border-gray-200;
+}
+.audit-report code {
+  @apply bg-gray-100 px-1 rounded text-sm font-mono;
+}
