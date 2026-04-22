@@ -5,6 +5,9 @@ const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
 })
 
+// Use the most capable model for deeper analysis
+const MODEL = 'claude-opus-4-7'
+
 export interface AuditInput {
   accountName?: string
   dateRange?: string
@@ -26,8 +29,8 @@ export async function streamAudit(
   let fullText = ''
 
   const stream = await client.messages.stream({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 5000,
+    model: MODEL,
+    max_tokens: 8000,
     system: systemPrompt,
     messages: [{ role: 'user', content: userMessage }],
   })
