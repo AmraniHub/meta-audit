@@ -1,5 +1,5 @@
 import Anthropic from '@anthropic-ai/sdk'
-import { AUDIT_SYSTEM_PROMPT, buildAuditUserPrompt } from './audit-prompt'
+import { buildSystemPrompt, buildAuditUserPrompt, Language } from './audit-prompt'
 
 const client = new Anthropic({
   apiKey: process.env.ANTHROPIC_API_KEY!,
@@ -13,34 +13,22 @@ export interface AuditInput {
   metrics?: string
   csvData?: string
   additionalContext?: string
-}
-
-export async function runAudit(input: AuditInput): Promise<string> {
-  const userMessage = buildAuditUserPrompt(input)
-
-  const response = await client.messages.create({
-    model: 'claude-sonnet-4-6',
-    max_tokens: 4096,
-    system: AUDIT_SYSTEM_PROMPT,
-    messages: [{ role: 'user', content: userMessage }],
-  })
-
-  const content = response.content[0]
-  if (content.type !== 'text') throw new Error('Unexpected response type')
-  return content.text
+  language?: Language
 }
 
 export async function streamAudit(
   input: AuditInput,
   onChunk: (text: string) => void
 ): Promise<string> {
+  const language: Language = input.language ?? 'english'
+  const systemPrompt = buildSystemPrompt(language)
   const userMessage = buildAuditUserPrompt(input)
   let fullText = ''
 
   const stream = await client.messages.stream({
     model: 'claude-sonnet-4-6',
-    max_tokens: 4096,
-    system: AUDIT_SYSTEM_PROMPT,
+    max_tokens: 5000,
+    system: systemPrompt,
     messages: [{ role: 'user', content: userMessage }],
   })
 
