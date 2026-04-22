@@ -7,17 +7,7 @@ export const maxDuration = 60
 export async function POST(req: NextRequest) {
   const body = await req.json()
 
-  const { accountName, dateRange, vertical, market, metrics, csvData, additionalContext, paid } =
-    body
-
-  // In production: verify payment via Stripe before running audit
-  // For now we accept a `paid: true` flag from the checkout flow
-  if (!paid) {
-    return new Response(JSON.stringify({ error: 'Payment required' }), {
-      status: 402,
-      headers: { 'Content-Type': 'application/json' },
-    })
-  }
+  const { accountName, dateRange, vertical, market, metrics, csvData, additionalContext } = body
 
   const encoder = new TextEncoder()
 

@@ -7,89 +7,80 @@ import { Suspense } from 'react'
 function AuditRunner() {
   const params = useSearchParams()
   const sessionId = params.get('session_id')
+  const mode = params.get('mode')
   const [status, setStatus] = useState<'verifying' | 'running' | 'done' | 'error'>('verifying')
   const [report, setReport] = useState('')
   const [error, setError] = useState('')
   const reportRef = useRef<HTMLDivElement>(null)
 
+  const streamAudit = (auditData: object) => {
+    setStatus('running')
+    fetch('/api/audit', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(auditData),
+    }).then((res) => {
+      const reader = res.body!.getReader()
+      const decoder = new TextDecoder()
+
+      const read = () => {
+        reader.read().then(({ done, value }) => {
+          if (done) { setStatus('done'); return }
+
+          const chunk = decoder.decode(value)
+          for (const line of chunk.split('\n')) {
+            if (!line.startsWith('data: ')) continue
+            const data = line.slice(6)
+            if (data === '[DONE]') { setStatus('done'); return }
+            try {
+              const parsed = JSON.parse(data)
+              if (parsed.text) {
+                setReport((r) => r + parsed.text)
+                setTimeout(() => reportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' }), 50)
+              }
+              if (parsed.error) { setStatus('error'); setError(parsed.error) }
+            } catch {}
+          }
+          read()
+        })
+      }
+      read()
+    }).catch(() => { setStatus('error'); setError('Audit failed. Please try again.') })
+  }
+
   useEffect(() => {
+    // Free / test mode — read data from sessionStorage
+    if (mode === 'free') {
+      try {
+        const raw = sessionStorage.getItem('auditData')
+        const auditData = raw ? JSON.parse(raw) : {}
+        sessionStorage.removeItem('auditData')
+        streamAudit(auditData)
+      } catch {
+        setStatus('error')
+        setError('Could not load audit data. Please go back and try again.')
+      }
+      return
+    }
+
+    // Paid mode — verify Stripe session first
     if (!sessionId) {
       setStatus('error')
       setError('No payment session found.')
       return
     }
 
-    // 1. Verify payment
     fetch(`/api/verify-session?session_id=${sessionId}`)
       .then((r) => r.json())
       .then(({ paid, metadata }) => {
-        if (!paid) {
-          setStatus('error')
-          setError('Payment not confirmed. Please try again.')
-          return
-        }
-
-        // 2. Parse audit data from Stripe metadata
+        if (!paid) { setStatus('error'); setError('Payment not confirmed. Please try again.'); return }
         let auditData = {}
-        try {
-          auditData = JSON.parse(metadata?.auditData || '{}')
-        } catch {}
-
-        setStatus('running')
-
-        // 3. Stream the audit
-        fetch('/api/audit', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...auditData, paid: true }),
-        }).then((res) => {
-          const reader = res.body!.getReader()
-          const decoder = new TextDecoder()
-
-          const read = () => {
-            reader.read().then(({ done, value }) => {
-              if (done) {
-                setStatus('done')
-                return
-              }
-
-              const chunk = decoder.decode(value)
-              const lines = chunk.split('\n')
-
-              for (const line of lines) {
-                if (line.startsWith('data: ')) {
-                  const data = line.slice(6)
-                  if (data === '[DONE]') {
-                    setStatus('done')
-                    return
-                  }
-                  try {
-                    const parsed = JSON.parse(data)
-                    if (parsed.text) {
-                      setReport((r) => r + parsed.text)
-                      setTimeout(() => {
-                        reportRef.current?.scrollIntoView({ behavior: 'smooth', block: 'end' })
-                      }, 50)
-                    }
-                    if (parsed.error) {
-                      setStatus('error')
-                      setError(parsed.error)
-                    }
-                  } catch {}
-                }
-              }
-
-              read()
-            })
-          }
-          read()
-        })
+        try { auditData = JSON.parse(metadata?.auditData || '{}') } catch {}
+        streamAudit({ ...auditData, paid: true })
       })
-      .catch(() => {
-        setStatus('error')
-        setError('Something went wrong. Contact support.')
-      })
-  }, [sessionId])
+      .catch(() => { setStatus('error'); setError('Something went wrong. Contact support.') })
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, mode])
 
   return (
     <main className="max-w-3xl mx-auto px-6 py-12">

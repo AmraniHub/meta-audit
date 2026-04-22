@@ -3,6 +3,8 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 
+const STRIPE_ENABLED = false
+
 const VERTICALS = [
   'Beauty / Cosmetics',
   'Fashion',
@@ -45,6 +47,12 @@ export default function AuditPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setLoading(true)
+
+    if (!STRIPE_ENABLED) {
+      sessionStorage.setItem('auditData', JSON.stringify(form))
+      router.push('/audit/run?mode=free')
+      return
+    }
 
     try {
       const res = await fetch('/api/checkout', {
@@ -171,7 +179,7 @@ export default function AuditPage() {
           disabled={loading}
           className="w-full bg-blue-600 text-white py-4 rounded-xl font-bold text-lg hover:bg-blue-700 transition disabled:opacity-60"
         >
-          {loading ? 'Redirecting to payment...' : 'Pay 499 MAD & Run Audit'}
+          {loading ? 'Starting audit...' : STRIPE_ENABLED ? 'Pay 499 MAD & Run Audit' : 'Run Audit (Test Mode)'}
         </button>
 
         <p className="text-center text-gray-400 text-xs">
